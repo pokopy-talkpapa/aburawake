@@ -78,12 +78,16 @@
   .dropzone .dzLabel{font-size:12px; margin-top:4px; font-weight:bold;}
   .dropzone.hover .icon{transform:scale(1.15);}
 
-  #hint{position:absolute; left:50%; bottom:14px; transform:translateX(-50%); background:#fff; padding:8px 16px; border-radius:20px; box-shadow:0 2px 6px rgba(0,0,0,0.15); font-size:13px; z-index:15; max-width:90%; text-align:center;}
-
   #successOverlay{position:absolute; inset:0; background:rgba(255,255,255,0.9); display:none; align-items:center; justify-content:center; flex-direction:column; z-index:60;}
   #successOverlay.show{display:flex;}
   #successOverlay .big{font-size:56px;}
   #successOverlay h2{color:var(--orange); font-size:26px; margin:6px 0 18px;}
+
+  #missionIntro{position:absolute; inset:0; background:var(--bg); display:none; align-items:center; justify-content:center; flex-direction:column; z-index:70; padding:24px; text-align:center;}
+  #missionIntro.show{display:flex;}
+  #missionIntro .badge{font-size:14px; background:var(--teal); color:#fff; border-radius:12px; padding:4px 14px; margin-bottom:14px;}
+  #missionIntro h2{font-size:30px; margin:0 0 14px; color:var(--brown);}
+  #missionIntro p{font-size:17px; color:var(--brown); max-width:520px; margin:0 0 24px;}
 
   .meterToggleLabel{font-size:12px; display:flex; align-items:center; gap:4px;}
 </style>
@@ -106,11 +110,16 @@
 
   <div id="playArea">
     <div id="stage"></div>
-    <div id="hint"></div>
     <div id="successOverlay">
       <div class="big">🎉</div>
       <h2>できた！</h2>
       <button class="orange" id="nextBtn">つぎのもんだいへ ▶</button>
+    </div>
+    <div id="missionIntro">
+      <div class="badge" id="missionIntroBadge">-</div>
+      <h2 id="missionIntroTitle">-</h2>
+      <p id="missionIntroDesc"></p>
+      <button class="orange" id="missionIntroStart">はじめる ▶</button>
     </div>
   </div>
 
@@ -128,23 +137,21 @@
    ========================================================= */
 
 const LEVELS = [
-  // --- かんたん：たしざん ---
+  // --- かんたん ---
   {
     id: 1, group: "かんたん", title:"1dLをつくろう",
     desc:"すいどうから 1dLカップに、ちょうど1dL いれよう。",
     containers:[ {id:'a', capacity:1, amount:0, x:0.5, label:'1dLカップ'} ],
     goal:{id:'a', amount:1},
-    hint:"1dLカップを すいどう（🚰）の上まで ドラッグしてね。"
   },
   {
     id: 2, group: "かんたん", title:"2dLをつくろう",
     desc:"すいどうから 2dLカップに、ちょうど2dL いれよう。",
     containers:[ {id:'a', capacity:2, amount:0, x:0.5, label:'2dLカップ'} ],
     goal:{id:'a', amount:2},
-    hint:"2dLカップを すいどう（🚰）の上まで ドラッグしてね。"
   },
   {
-    id: 3, group: "かんたん", title:"3dLをつくろう（たしざん）",
+    id: 3, group: "かんたん", title:"3dLをつくろう",
     desc:"1dLカップと2dLカップを つかって、大きい入れ物に ちょうど3dL つくろう。",
     containers:[
       {id:'a', capacity:1, amount:0, x:0.22, label:'1dLカップ'},
@@ -152,39 +159,34 @@ const LEVELS = [
       {id:'c', capacity:5, amount:0, x:0.78, label:'大きい入れ物'},
     ],
     goal:{id:'c', amount:3},
-    hint:"1dLと2dLを、それぞれ大きい入れ物に そそいでみよう。1dL＋2dL＝？"
   },
   {
-    id: 4, group: "かんたん", title:"4dLをつくろう（たしざん）",
-    desc:"2dLカップを2つ つかって、大きい入れ物に ちょうど4dL つくろう。",
+    id: 4, group: "かんたん", title:"4dLをつくろう",
+    desc:"2dLカップを つかって、大きい入れ物に ちょうど4dL つくろう。",
     containers:[
-      {id:'a', capacity:2, amount:0, x:0.22, label:'2dLカップ①'},
-      {id:'b', capacity:2, amount:0, x:0.5, label:'2dLカップ②'},
-      {id:'c', capacity:5, amount:0, x:0.78, label:'大きい入れ物'},
+      {id:'a', capacity:2, amount:0, x:0.3, label:'2dLカップ'},
+      {id:'c', capacity:5, amount:0, x:0.7, label:'大きい入れ物'},
     ],
     goal:{id:'c', amount:4},
-    hint:"2dLカップを2かい、大きい入れ物に そそごう。2dL＋2dL＝？"
   },
-  // --- ちゅうくらい：ひきざん ---
+  // --- ちゅうくらい ---
   {
-    id: 5, group: "ちゅうくらい（ひきざん）", title:"5dLから2dLをとりわけよう",
+    id: 5, group: "ちゅうくらい", title:"5dLから2dLをとりわけよう",
     desc:"5dLいっぱいの入れ物から、2dLカップに ちょうど2dL うつそう。のこりは何dL？",
     containers:[
       {id:'a', capacity:5, amount:5, x:0.3, label:'5dL（いっぱい）'},
       {id:'b', capacity:2, amount:0, x:0.65, label:'2dLカップ'},
     ],
     goal:{id:'a', amount:3},
-    hint:"5dLの入れ物を、2dLカップの上まで ドラッグして そそごう。5dL－2dL＝？"
   },
   {
-    id: 6, group: "ちゅうくらい（ひきざん）", title:"6dLから4dLをとりわけよう",
+    id: 6, group: "ちゅうくらい", title:"6dLから4dLをとりわけよう",
     desc:"6dLいっぱいの入れ物から、4dLカップに そそごう。のこりは何dL？",
     containers:[
       {id:'a', capacity:6, amount:6, x:0.3, label:'6dL（いっぱい）'},
       {id:'b', capacity:4, amount:0, x:0.65, label:'4dLカップ'},
     ],
     goal:{id:'a', amount:2},
-    hint:"6dLの入れ物を、4dLカップの上まで ドラッグして そそごう。6dL－4dL＝？"
   },
   // --- 本格：油分け算 ---
   {
@@ -196,7 +198,6 @@ const LEVELS = [
       {id:'c', capacity:3, amount:0, x:0.8, label:'3dLマス'},
     ],
     goal:{id:'a', amount:4},
-    hint:"目盛りは使えないよ！ 「そそぐ」は、相手がいっぱいになるか、自分がからっぽになるまで。何手でできるかな？"
   },
   {
     id: 8, group: "ほんかく油分け", title:"10dLを5dLと5dLに分けよう",
@@ -207,7 +208,6 @@ const LEVELS = [
       {id:'c', capacity:3, amount:0, x:0.8, label:'3dLマス'},
     ],
     goal:{id:'a', amount:5},
-    hint:"少しむずかしいよ。まず3dLマスをたるからいっぱいにして、7dLマスへ…など、じゅんばんを考えよう。"
   },
 ];
 
@@ -218,13 +218,16 @@ let state = null; // current level runtime state
 let progress = JSON.parse(localStorage.getItem('aburawake_progress') || '{}');
 
 const stage = document.getElementById('stage');
-const hintEl = document.getElementById('hint');
 const goalText = document.getElementById('goalText');
 const levelBadge = document.getElementById('levelBadge');
 const meterToggle = document.getElementById('meterToggle');
 const successOverlay = document.getElementById('successOverlay');
 const levelSelect = document.getElementById('levelSelect');
 const levelGroups = document.getElementById('levelGroups');
+const missionIntro = document.getElementById('missionIntro');
+const missionIntroBadge = document.getElementById('missionIntroBadge');
+const missionIntroTitle = document.getElementById('missionIntroTitle');
+const missionIntroDesc = document.getElementById('missionIntroDesc');
 
 function saveProgress(){ localStorage.setItem('aburawake_progress', JSON.stringify(progress)); }
 
@@ -260,9 +263,20 @@ function loadLevel(id){
   };
   levelBadge.textContent = def.title;
   goalText.textContent = `🎯 ${def.desc}`;
-  hintEl.textContent = def.hint;
   successOverlay.classList.remove('show');
   renderStage();
+}
+
+function beginMission(id){
+  const def = LEVELS.find(l => l.id === id);
+  missionIntroBadge.textContent = def.group;
+  missionIntroTitle.textContent = def.title;
+  missionIntroDesc.textContent = def.desc;
+  missionIntro.dataset.nextId = id;
+  levelBadge.textContent = def.title;
+  goalText.textContent = `🎯 ${def.desc}`;
+  successOverlay.classList.remove('show');
+  missionIntro.classList.add('show');
 }
 
 function renderStage(){
@@ -557,15 +571,19 @@ document.getElementById('levelBtn').onclick = () => { buildLevelSelect(); levelS
 document.getElementById('nextBtn').onclick = () => {
   const idx = LEVELS.findIndex(l => l.id === state.def.id);
   const next = LEVELS[idx+1];
-  if(next) loadLevel(next.id);
+  if(next) beginMission(next.id);
   else { buildLevelSelect(); levelSelect.classList.add('show'); }
+};
+document.getElementById('missionIntroStart').onclick = () => {
+  missionIntro.classList.remove('show');
+  loadLevel(Number(missionIntro.dataset.nextId));
 };
 
 window.addEventListener('resize', () => { if(state) renderStage(); });
 
 // init
 buildLevelSelect();
-loadLevel(1);
+beginMission(1);
 </script>
 </body>
 </html>
