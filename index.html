@@ -197,7 +197,7 @@ const LEVELS = [
       {id:'b', capacity:5, amount:0, x:0.5, label:'5dLマス'},
       {id:'c', capacity:3, amount:0, x:0.8, label:'3dLマス'},
     ],
-    goal:{id:'a', amount:4},
+    goal:[{id:'a', amount:4}, {id:'b', amount:4}],
   },
   {
     id: 8, group: "ほんかく油分け", title:"10dLを5dLと5dLに分けよう",
@@ -207,7 +207,7 @@ const LEVELS = [
       {id:'b', capacity:7, amount:0, x:0.5, label:'7dLマス'},
       {id:'c', capacity:3, amount:0, x:0.8, label:'3dLマス'},
     ],
-    goal:{id:'a', amount:5},
+    goal:[{id:'a', amount:5}, {id:'b', amount:5}],
   },
 ];
 
@@ -557,9 +557,12 @@ function performPour(sourceDef, target){
 }
 
 function checkGoal(){
-  const g = state.def.goal;
-  const c = state.containers.find(c => c.id === g.id);
-  if(c && c.amount === g.amount){
+  const conditions = Array.isArray(state.def.goal) ? state.def.goal : [state.def.goal];
+  const allMet = conditions.every(g => {
+    const c = state.containers.find(c => c.id === g.id);
+    return c && c.amount === g.amount;
+  });
+  if(allMet){
     progress[state.def.id] = true;
     saveProgress();
     setTimeout(() => successOverlay.classList.add('show'), 400);
