@@ -49,11 +49,8 @@
   .container{
     position:absolute; width:auto; touch-action:none; user-select:none;
     display:flex; flex-direction:column; align-items:center; cursor:grab;
-    transform-origin:bottom center; transition:transform 0.25s ease;
   }
-  .container.dragging{cursor:grabbing; z-index:50; filter:drop-shadow(0 6px 10px rgba(0,0,0,0.3)); transition:none;}
-  .container.tiltRight{transform:rotate(38deg);}
-  .container.tiltLeft{transform:rotate(-38deg);}
+  .container.dragging{cursor:grabbing; z-index:50; filter:drop-shadow(0 6px 10px rgba(0,0,0,0.3));}
   .flask{
     position:relative; border:4px solid var(--brown);
     border-top:none; border-radius:0 0 16px 16px; background:rgba(255,255,255,0.5);
@@ -402,6 +399,7 @@ function attachDrag(el, containerDef){
     el.style.left = (point.x - stageRect.left - offsetX) + 'px';
     el.style.top = (point.y - stageRect.top - offsetY) + 'px';
     highlightTarget(point);
+    checkHoverFill(point, el, containerDef);
   };
 
   const onUp = (e) => {
@@ -422,6 +420,9 @@ function attachDrag(el, containerDef){
       const targetEl = target.type === 'container'
         ? stage.querySelector(`.container[data-id="${target.id}"]`)
         : stage.querySelector(`.dropzone[data-zone-id="${target.id}"]`);
+      if(target.type === 'container' && targetEl){
+        positionAboveTarget(el, targetEl);
+      }
       const poured = performPour(containerDef, target);
       if(poured && targetEl){
         animatePour(el, targetEl);
@@ -437,12 +438,31 @@ function attachDrag(el, containerDef){
   el.addEventListener('touchstart', onDown, {passive:false});
 }
 
+function positionAboveTarget(sourceEl, targetEl){
+  const stageRect = stage.getBoundingClientRect();
+  const targetRect = targetEl.getBoundingClientRect();
+  const sourceRect = sourceEl.getBoundingClientRect();
+  const left = targetRect.left + targetRect.width/2 - stageRect.left - sourceRect.width/2;
+  const top = Math.max(0, targetRect.top - stageRect.top - sourceRect.height - 14);
+  sourceEl.style.left = left + 'px';
+  sourceEl.style.top = top + 'px';
+}
+
+function checkHoverFill(point, el, containerDef){
+  const target = findDropTarget(point, el);
+  if(!target || target.type !== 'zone' || target.id !== TAP.id) return;
+  const source = state.containers.find(c => c.id === containerDef.id);
+  if(!source || source.amount >= source.capacity) return;
+  source.amount = source.capacity;
+  refreshAll();
+  checkGoal();
+  const tapEl = stage.querySelector(`.dropzone[data-zone-id="${TAP.id}"]`);
+  if(tapEl) animatePour(tapEl, el);
+}
+
 function animatePour(sourceEl, targetEl){
   const sRect = sourceEl.getBoundingClientRect();
   const tRect = targetEl.getBoundingClientRect();
-  const tiltClass = (tRect.left + tRect.width/2 < sRect.left + sRect.width/2) ? 'tiltLeft' : 'tiltRight';
-  sourceEl.classList.add(tiltClass);
-  setTimeout(() => sourceEl.classList.remove(tiltClass), 600);
 
   const x1 = sRect.left + sRect.width/2;
   const y1 = sRect.top + sRect.height*0.55;
