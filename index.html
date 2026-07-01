@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>あぶらわけ - たねまき</title>
+<style>
+  :root{
+    --teal:#4DBCBC;
+    --orange:#F7931E;
+    --brown:#3C2415;
+    --water:#4DBCBC;
+    --bg:#FFF8EF;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{margin:0; height:100%; overflow:hidden; touch-action:none; font-family:"Hiragino Maru Gothic ProN","Yu Gothic",sans-serif; background:var(--bg); color:var(--brown);}
+  #app{position:relative; width:100vw; height:100vh; display:flex; flex-direction:column;}
+
+  /* ---------- Header ---------- */
+  #header{display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,0.08); z-index:20; flex-wrap:wrap; gap:8px;}
+  #titleWrap{display:flex; align-items:center; gap:10px;}
+  #titleWrap h1{font-size:18px; margin:0;}
+  #levelBadge{font-size:13px; background:var(--teal); color:#fff; border-radius:12px; padding:3px 10px;}
+  #goalText{font-size:15px; font-weight:bold; color:var(--orange);}
+  #controls{display:flex; gap:8px; align-items:center;}
+  button{font-family:inherit; font-size:14px; border:none; border-radius:10px; padding:8px 12px; cursor:pointer; background:var(--teal); color:#fff; box-shadow:0 2px 0 rgba(0,0,0,0.15);}
+  button:active{transform:translateY(1px); box-shadow:none;}
+  button.secondary{background:#fff; color:var(--brown); border:2px solid var(--teal);}
+  button.orange{background:var(--orange);}
+  button:disabled{opacity:0.4; cursor:default;}
+
+  /* ---------- Level select ---------- */
+  #levelSelect{position:absolute; inset:0; background:var(--bg); z-index:30; overflow-y:auto; padding:20px; display:none;}
+  #levelSelect.show{display:block;}
+  #levelSelect h2{text-align:center; color:var(--brown);}
+  .levelGroup{margin-bottom:18px;}
+  .levelGroup h3{color:var(--teal); font-size:14px; margin:6px 4px;}
+  .levelGrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px;}
+  .levelCard{background:#fff; border-radius:14px; padding:12px; box-shadow:0 2px 6px rgba(0,0,0,0.1); cursor:pointer; border:2px solid transparent;}
+  .levelCard.cleared{border-color:var(--orange);}
+  .levelCard h4{margin:0 0 6px 0; font-size:15px;}
+  .levelCard p{margin:0; font-size:12px; color:#888;}
+  .star{color:var(--orange);}
+
+  /* ---------- Play area ---------- */
+  #playArea{position:relative; flex:1; overflow:hidden;}
+  #stage{position:absolute; inset:0;}
+
+  .container{
+    position:absolute; width:96px; touch-action:none; user-select:none;
+    display:flex; flex-direction:column; align-items:center; cursor:grab;
+  }
+  .container.dragging{cursor:grabbing; z-index:50; filter:drop-shadow(0 6px 10px rgba(0,0,0,0.3));}
+  .flask{
+    position:relative; width:90px; height:130px; border:4px solid var(--brown);
+    border-top:none; border-radius:0 0 16px 16px; background:rgba(255,255,255,0.5);
+    overflow:hidden;
+  }
+  .flaskTop{width:98px; height:8px; margin-bottom:-4px; border:4px solid var(--brown); border-bottom:none; border-radius:6px 6px 0 0; background:#fff;}
+  .water{position:absolute; bottom:0; left:0; right:0; background:var(--water); transition:height 0.5s cubic-bezier(.4,1.4,.6,1);}
+  .waterTop{position:absolute; top:0; left:0; right:0; height:6px; background:rgba(255,255,255,0.5);}
+  .ticks{position:absolute; inset:0; pointer-events:none;}
+  .tick{position:absolute; left:0; right:0; height:1px; background:rgba(60,36,21,0.35); display:flex; align-items:center;}
+  .tick span{font-size:9px; color:var(--brown); margin-left:3px; background:rgba(255,255,255,0.7); border-radius:3px; padding:0 2px;}
+  .label{margin-top:6px; font-size:12px; font-weight:bold; text-align:center; white-space:nowrap;}
+  .readout{font-size:13px; font-weight:bold; color:var(--teal); min-height:16px;}
+
+  .dropzone{position:absolute; display:flex; flex-direction:column; align-items:center; width:90px;}
+  .dropzone .icon{font-size:40px; line-height:1;}
+  .dropzone .dzLabel{font-size:12px; margin-top:4px; font-weight:bold;}
+  .dropzone.hover .icon{transform:scale(1.15);}
+
+  #hint{position:absolute; left:50%; bottom:14px; transform:translateX(-50%); background:#fff; padding:8px 16px; border-radius:20px; box-shadow:0 2px 6px rgba(0,0,0,0.15); font-size:13px; z-index:15; max-width:90%; text-align:center;}
+
+  #successOverlay{position:absolute; inset:0; background:rgba(255,255,255,0.9); display:none; align-items:center; justify-content:center; flex-direction:column; z-index:60;}
+  #successOverlay.show{display:flex;}
+  #successOverlay .big{font-size:56px;}
+  #successOverlay h2{color:var(--orange); font-size:26px; margin:6px 0 18px;}
+
+  .meterToggleLabel{font-size:12px; display:flex; align-items:center; gap:4px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="header">
+    <div id="titleWrap">
+      <h1>🛢️ あぶらわけ</h1>
+      <span id="levelBadge">-</span>
+    </div>
+    <div id="goalText"></div>
+    <div id="controls">
+      <label class="meterToggleLabel"><input type="checkbox" id="meterToggle"> めもりをみる</label>
+      <button class="secondary" id="resetBtn">🔄 やりなおす</button>
+      <button class="secondary" id="levelBtn">📋 もんだい</button>
+    </div>
+  </div>
+
+  <div id="playArea">
+    <div id="stage"></div>
+    <div id="hint"></div>
+    <div id="successOverlay">
+      <div class="big">🎉</div>
+      <h2>できた！</h2>
+      <button class="orange" id="nextBtn">つぎのもんだいへ ▶</button>
+    </div>
+  </div>
+
+  <div id="levelSelect">
+    <h2>🛢️ あぶらわけ - もんだいをえらぼう</h2>
+    <div id="levelGroups"></div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================
+   あぶらわけ - 容器を「そそぐ／みたす／すてる」で
+   目標の量をぴったり作る、油分け算シミュレーター
+   ========================================================= */
+
+const LEVELS = [
+  // --- かんたん：たしざん ---
+  {
+    id: 1, group: "かんたん", title:"1dLをつくろう",
+    desc:"すいどうから 1dLカップに、ちょうど1dL いれよう。",
+    containers:[ {id:'a', capacity:1, amount:0, x:0.5, label:'1dLカップ'} ],
+    goal:{id:'a', amount:1},
+    hint:"1dLカップを すいどう（🚰）の上まで ドラッグしてね。"
+  },
+  {
+    id: 2, group: "かんたん", title:"2dLをつくろう",
+    desc:"すいどうから 2dLカップに、ちょうど2dL いれよう。",
+    containers:[ {id:'a', capacity:2, amount:0, x:0.5, label:'2dLカップ'} ],
+    goal:{id:'a', amount:2},
+    hint:"2dLカップを すいどう（🚰）の上まで ドラッグしてね。"
+  },
+  {
+    id: 3, group: "かんたん", title:"3dLをつくろう（たしざん）",
+    desc:"1dLカップと2dLカップを つかって、大きい入れ物に ちょうど3dL つくろう。",
+    containers:[
+      {id:'a', capacity:1, amount:0, x:0.22, label:'1dLカップ'},
+      {id:'b', capacity:2, amount:0, x:0.5, label:'2dLカップ'},
+      {id:'c', capacity:5, amount:0, x:0.78, label:'大きい入れ物'},
+    ],
+    goal:{id:'c', amount:3},
+    hint:"1dLと2dLを、それぞれ大きい入れ物に そそいでみよう。1dL＋2dL＝？"
+  },
+  {
+    id: 4, group: "かんたん", title:"4dLをつくろう（たしざん）",
+    desc:"2dLカップを2つ つかって、大きい入れ物に ちょうど4dL つくろう。",
+    containers:[
+      {id:'a', capacity:2, amount:0, x:0.22, label:'2dLカップ①'},
+      {id:'b', capacity:2, amount:0, x:0.5, label:'2dLカップ②'},
+      {id:'c', capacity:5, amount:0, x:0.78, label:'大きい入れ物'},
+    ],
+    goal:{id:'c', amount:4},
+    hint:"2dLカップを2かい、大きい入れ物に そそごう。2dL＋2dL＝？"
+  },
+  // --- ちゅうくらい：ひきざん ---
+  {
+    id: 5, group: "ちゅうくらい（ひきざん）", title:"5dLから2dLをとりわけよう",
+    desc:"5dLいっぱいの入れ物から、2dLカップに ちょうど2dL うつそう。のこりは何dL？",
+    containers:[
+      {id:'a', capacity:5, amount:5, x:0.3, label:'5dL（いっぱい）'},
+      {id:'b', capacity:2, amount:0, x:0.65, label:'2dLカップ'},
+    ],
+    goal:{id:'a', amount:3},
+    hint:"5dLの入れ物を、2dLカップの上まで ドラッグして そそごう。5dL－2dL＝？"
+  },
+  {
+    id: 6, group: "ちゅうくらい（ひきざん）", title:"6dLから4dLをとりわけよう",
+    desc:"6dLいっぱいの入れ物から、4dLカップに そそごう。のこりは何dL？",
+    containers:[
+      {id:'a', capacity:6, amount:6, x:0.3, label:'6dL（いっぱい）'},
+      {id:'b', capacity:4, amount:0, x:0.65, label:'4dLカップ'},
+    ],
+    goal:{id:'a', amount:2},
+    hint:"6dLの入れ物を、4dLカップの上まで ドラッグして そそごう。6dL－4dL＝？"
+  },
+  // --- 本格：油分け算 ---
+  {
+    id: 7, group: "ほんかく油分け", title:"8dLを4dLと4dLに分けよう",
+    desc:"8dLいっぱいのたる・5dLマス・3dLマス（からっぽ）だけを つかって、ちょうど4dLずつに分けよう。",
+    containers:[
+      {id:'a', capacity:8, amount:8, x:0.2, label:'8dL たる'},
+      {id:'b', capacity:5, amount:0, x:0.5, label:'5dLマス'},
+      {id:'c', capacity:3, amount:0, x:0.8, label:'3dLマス'},
+    ],
+    goal:{id:'a', amount:4},
+    hint:"目盛りは使えないよ！ 「そそぐ」は、相手がいっぱいになるか、自分がからっぽになるまで。何手でできるかな？"
+  },
+  {
+    id: 8, group: "ほんかく油分け", title:"10dLを5dLと5dLに分けよう",
+    desc:"10dLいっぱいのたる・7dLマス・3dLマス（からっぽ）だけを つかって、ちょうど5dLずつに分けよう。",
+    containers:[
+      {id:'a', capacity:10, amount:10, x:0.2, label:'10dL たる'},
+      {id:'b', capacity:7, amount:0, x:0.5, label:'7dLマス'},
+      {id:'c', capacity:3, amount:0, x:0.8, label:'3dLマス'},
+    ],
+    goal:{id:'a', amount:5},
+    hint:"少しむずかしいよ。まず3dLマスをたるからいっぱいにして、7dLマスへ…など、じゅんばんを考えよう。"
+  },
+];
+
+const TAP = {id:'__tap', label:'すいどう'};
+const SINK = {id:'__sink', label:'すてる'};
+
+let state = null; // current level runtime state
+let progress = JSON.parse(localStorage.getItem('aburawake_progress') || '{}');
+
+const stage = document.getElementById('stage');
+const hintEl = document.getElementById('hint');
+const goalText = document.getElementById('goalText');
+const levelBadge = document.getElementById('levelBadge');
+const meterToggle = document.getElementById('meterToggle');
+const successOverlay = document.getElementById('successOverlay');
+const levelSelect = document.getElementById('levelSelect');
+const levelGroups = document.getElementById('levelGroups');
+
+function saveProgress(){ localStorage.setItem('aburawake_progress', JSON.stringify(progress)); }
+
+function buildLevelSelect(){
+  levelGroups.innerHTML = '';
+  const groups = {};
+  LEVELS.forEach(l => { (groups[l.group] = groups[l.group]||[]).push(l); });
+  Object.keys(groups).forEach(gname => {
+    const wrap = document.createElement('div');
+    wrap.className = 'levelGroup';
+    const h3 = document.createElement('h3');
+    h3.textContent = gname;
+    wrap.appendChild(h3);
+    const grid = document.createElement('div');
+    grid.className = 'levelGrid';
+    groups[gname].forEach(l => {
+      const card = document.createElement('div');
+      card.className = 'levelCard' + (progress[l.id] ? ' cleared' : '');
+      card.innerHTML = `<h4>${progress[l.id] ? '<span class="star">★</span> ' : ''}${l.title}</h4><p>${l.desc}</p>`;
+      card.onclick = () => { loadLevel(l.id); levelSelect.classList.remove('show'); };
+      grid.appendChild(card);
+    });
+    wrap.appendChild(grid);
+    levelGroups.appendChild(wrap);
+  });
+}
+
+function loadLevel(id){
+  const def = LEVELS.find(l => l.id === id);
+  state = {
+    def,
+    containers: def.containers.map(c => ({...c})),
+  };
+  levelBadge.textContent = def.title;
+  goalText.textContent = `🎯 ${def.desc}`;
+  hintEl.textContent = def.hint;
+  successOverlay.classList.remove('show');
+  renderStage();
+}
+
+function renderStage(){
+  stage.innerHTML = '';
+
+  // dropzones: tap (top-left) and sink (top-right)
+  stage.appendChild(makeDropzone(TAP, '🚰', 0.06, 0.10));
+  stage.appendChild(makeDropzone(SINK, '🗑️', 0.94, 0.10));
+
+  state.containers.forEach(c => {
+    stage.appendChild(makeContainer(c));
+  });
+}
+
+function makeDropzone(def, icon, xFrac, yFrac){
+  const el = document.createElement('div');
+  el.className = 'dropzone';
+  el.dataset.zoneId = def.id;
+  el.innerHTML = `<div class="icon">${icon}</div><div class="dzLabel">${def.label}</div>`;
+  positionEl(el, xFrac, yFrac);
+  return el;
+}
+
+function positionEl(el, xFrac, yFrac){
+  requestAnimationFrame(() => {
+    const rect = stage.getBoundingClientRect();
+    el.style.left = (rect.width * xFrac - el.offsetWidth/2) + 'px';
+    el.style.top = (rect.height * yFrac) + 'px';
+  });
+}
+
+function makeContainer(c){
+  const el = document.createElement('div');
+  el.className = 'container';
+  el.dataset.id = c.id;
+  positionEl(el, c.x, 0.42);
+
+  const top = document.createElement('div');
+  top.className = 'flaskTop';
+  el.appendChild(top);
+
+  const flask = document.createElement('div');
+  flask.className = 'flask';
+
+  const water = document.createElement('div');
+  water.className = 'water';
+  const waterTop = document.createElement('div');
+  waterTop.className = 'waterTop';
+  water.appendChild(waterTop);
+  flask.appendChild(water);
+
+  const ticks = document.createElement('div');
+  ticks.className = 'ticks';
+  for(let i=1;i<c.capacity;i++){
+    const t = document.createElement('div');
+    t.className = 'tick';
+    t.style.bottom = (i / c.capacity * 100) + '%';
+    t.innerHTML = `<span>${i}</span>`;
+    ticks.appendChild(t);
+  }
+  flask.appendChild(ticks);
+  el.appendChild(flask);
+
+  const label = document.createElement('div');
+  label.className = 'label';
+  label.textContent = c.label;
+  el.appendChild(label);
+
+  const readout = document.createElement('div');
+  readout.className = 'readout';
+  el.appendChild(readout);
+
+  updateContainerVisual(c, el);
+  attachDrag(el, c);
+  return el;
+}
+
+function updateContainerVisual(c, el){
+  el = el || stage.querySelector(`.container[data-id="${c.id}"]`);
+  if(!el) return;
+  const water = el.querySelector('.water');
+  const pct = Math.max(0, Math.min(100, (c.amount / c.capacity) * 100));
+  water.style.height = pct + '%';
+  const ticks = el.querySelector('.ticks');
+  const readout = el.querySelector('.readout');
+  const showMeter = meterToggle.checked;
+  ticks.style.opacity = showMeter ? '1' : '0';
+  readout.textContent = showMeter ? `${c.amount}dL / ${c.capacity}dL` : '';
+}
+
+function refreshAll(){
+  state.containers.forEach(c => updateContainerVisual(c));
+}
+
+meterToggle.addEventListener('change', refreshAll);
+
+/* ---------- drag & drop logic ---------- */
+function attachDrag(el, containerDef){
+  let dragging = false, offsetX=0, offsetY=0, startX=0, startY=0;
+
+  const onDown = (e) => {
+    e.preventDefault();
+    const point = getPoint(e);
+    const rect = el.getBoundingClientRect();
+    offsetX = point.x - rect.left;
+    offsetY = point.y - rect.top;
+    startX = point.x; startY = point.y;
+    dragging = true;
+    el.classList.add('dragging');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('touchmove', onMove, {passive:false});
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchend', onUp);
+  };
+
+  const onMove = (e) => {
+    if(!dragging) return;
+    e.preventDefault();
+    const point = getPoint(e);
+    const stageRect = stage.getBoundingClientRect();
+    el.style.left = (point.x - stageRect.left - offsetX) + 'px';
+    el.style.top = (point.y - stageRect.top - offsetY) + 'px';
+    highlightTarget(point);
+  };
+
+  const onUp = (e) => {
+    if(!dragging) return;
+    dragging = false;
+    el.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.removeEventListener('touchend', onUp);
+    clearHighlight();
+
+    const point = getLastPoint(e);
+    const target = findDropTarget(point, el);
+    if(target){
+      performPour(containerDef, target);
+    }
+    // snap back to home slot
+    const homeC = state.containers.find(c => c.id === containerDef.id);
+    positionEl(el, homeC.x, 0.42);
+  };
+
+  el.addEventListener('mousedown', onDown);
+  el.addEventListener('touchstart', onDown, {passive:false});
+}
+
+function getPoint(e){
+  if(e.touches && e.touches[0]) return {x:e.touches[0].clientX, y:e.touches[0].clientY};
+  return {x:e.clientX, y:e.clientY};
+}
+function getLastPoint(e){
+  if(e.changedTouches && e.changedTouches[0]) return {x:e.changedTouches[0].clientX, y:e.changedTouches[0].clientY};
+  return {x:e.clientX, y:e.clientY};
+}
+
+function findDropTarget(point, draggedEl){
+  const els = document.elementsFromPoint(point.x, point.y);
+  for(const cand of els){
+    if(cand === draggedEl || draggedEl.contains(cand)) continue;
+    const containerEl = cand.closest('.container');
+    if(containerEl && containerEl !== draggedEl) return {type:'container', id: containerEl.dataset.id};
+    const zoneEl = cand.closest('.dropzone');
+    if(zoneEl) return {type:'zone', id: zoneEl.dataset.zoneId};
+  }
+  return null;
+}
+
+let hoverEl = null;
+function highlightTarget(point){
+  clearHighlight();
+  const els = document.elementsFromPoint(point.x, point.y);
+  for(const cand of els){
+    const zoneEl = cand.closest('.dropzone');
+    if(zoneEl){ zoneEl.classList.add('hover'); hoverEl = zoneEl; return; }
+  }
+}
+function clearHighlight(){
+  if(hoverEl){ hoverEl.classList.remove('hover'); hoverEl = null; }
+}
+
+function performPour(sourceDef, target){
+  const source = state.containers.find(c => c.id === sourceDef.id);
+  if(!source) return;
+
+  if(target.type === 'zone' && target.id === TAP.id){
+    source.amount = source.capacity; // fill from tap
+  } else if(target.type === 'zone' && target.id === SINK.id){
+    source.amount = 0; // dump out
+  } else if(target.type === 'container'){
+    const dest = state.containers.find(c => c.id === target.id);
+    if(!dest) return;
+    const move = Math.min(source.amount, dest.capacity - dest.amount);
+    if(move <= 0) return;
+    source.amount -= move;
+    dest.amount += move;
+  } else {
+    return;
+  }
+  refreshAll();
+  checkGoal();
+}
+
+function checkGoal(){
+  const g = state.def.goal;
+  const c = state.containers.find(c => c.id === g.id);
+  if(c && c.amount === g.amount){
+    progress[state.def.id] = true;
+    saveProgress();
+    setTimeout(() => successOverlay.classList.add('show'), 400);
+  }
+}
+
+document.getElementById('resetBtn').onclick = () => loadLevel(state.def.id);
+document.getElementById('levelBtn').onclick = () => { buildLevelSelect(); levelSelect.classList.add('show'); };
+document.getElementById('nextBtn').onclick = () => {
+  const idx = LEVELS.findIndex(l => l.id === state.def.id);
+  const next = LEVELS[idx+1];
+  if(next) loadLevel(next.id);
+  else { buildLevelSelect(); levelSelect.classList.add('show'); }
+};
+
+window.addEventListener('resize', () => { if(state) renderStage(); });
+
+// init
+buildLevelSelect();
+loadLevel(1);
+</script>
+</body>
+</html>
