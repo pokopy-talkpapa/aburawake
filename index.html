@@ -97,6 +97,12 @@
   #missionIntro p{font-size:17px; color:var(--brown); max-width:520px; margin:0 0 24px;}
 
   .meterToggleLabel{font-size:12px; display:flex; align-items:center; gap:4px;}
+
+  #shotPreview{position:fixed; inset:0; background:rgba(60,36,21,0.7); display:none; align-items:center; justify-content:center; flex-direction:column; z-index:200; padding:20px;}
+  #shotPreview.show{display:flex;}
+  #shotPreview .shotCard{background:#fff; border-radius:16px; padding:16px; max-width:92vw; max-height:80vh; display:flex; flex-direction:column; align-items:center; gap:12px;}
+  #shotPreview img{max-width:100%; max-height:50vh; border-radius:8px; border:2px solid var(--bg);}
+  #shotPreview .shotBtns{display:flex; gap:10px;}
 </style>
 </head>
 <body>
@@ -130,6 +136,16 @@
       <h2 id="missionIntroTitle">-</h2>
       <p id="missionIntroDesc"></p>
       <button class="orange" id="missionIntroStart">はじめる ▶</button>
+    </div>
+  </div>
+
+  <div id="shotPreview">
+    <div class="shotCard">
+      <img id="shotPreviewImg" alt="スクショ">
+      <div class="shotBtns">
+        <button class="orange" id="shotSaveBtn">📤 ほぞんする</button>
+        <button class="secondary" id="shotCloseBtn">✕ とじる</button>
+      </div>
     </div>
   </div>
 
@@ -681,6 +697,10 @@ function showSuccess(moves, isNewBest, isPerfectRun){
   successOverlay.classList.add('show');
 }
 
+const shotPreview = document.getElementById('shotPreview');
+const shotPreviewImg = document.getElementById('shotPreviewImg');
+let pendingShot = null; // {blob, filename}
+
 document.getElementById('shotBtn').onclick = () => {
   if(typeof html2canvas !== 'function') return;
   html2canvas(document.getElementById('playArea'), {backgroundColor:'#FFF8EF'}).then(canvas => {
@@ -690,27 +710,44 @@ document.getElementById('shotBtn').onclick = () => {
     const filename = `あぶらわけ_${stamp}.png`;
     canvas.toBlob(blob => {
       if(!blob) return;
-      const file = new File([blob], filename, {type:'image/png'});
-      const fallbackDownload = (reason) => {
-        showShotDebug('ファイル保存 (' + reason + ')');
-        const link = document.createElement('a');
-        link.download = filename;
-        link.href = URL.createObjectURL(blob);
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(link.href), 3000);
-      };
-      if(navigator.canShare && navigator.canShare({files:[file]})){
-        navigator.share({files:[file]}).then(() => {
-          showShotDebug('共有シートOK');
-        }).catch(err => {
-          if(err && err.name === 'AbortError'){ showShotDebug('共有キャンセル'); return; }
-          fallbackDownload('共有失敗:' + (err && err.name));
-        });
-        return;
-      }
-      fallbackDownload('共有非対応');
+      pendingShot = {blob, filename};
+      if(shotPreviewImg.dataset.prevUrl) URL.revokeObjectURL(shotPreviewImg.dataset.prevUrl);
+      const url = URL.createObjectURL(blob);
+      shotPreviewImg.src = url;
+      shotPreviewImg.dataset.prevUrl = url;
+      shotPreview.classList.add('show');
     }, 'image/png');
   });
+};
+
+document.getElementById('shotCloseBtn').onclick = () => {
+  shotPreview.classList.remove('show');
+};
+
+document.getElementById('shotSaveBtn').onclick = () => {
+  if(!pendingShot) return;
+  const {blob, filename} = pendingShot;
+  const file = new File([blob], filename, {type:'image/png'});
+  const fallbackDownload = (reason) => {
+    showShotDebug('ファイル保存 (' + reason + ')');
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 3000);
+  };
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    navigator.share({files:[file]}).then(() => {
+      shotPreview.classList.remove('show');
+    }).catch(err => {
+      if(err && err.name === 'AbortError') return;
+      fallbackDownload('共有失敗:' + (err && err.name));
+      shotPreview.classList.remove('show');
+    });
+    return;
+  }
+  fallbackDownload('共有非対応');
+  shotPreview.classList.remove('show');
 };
 
 function showShotDebug(text){
