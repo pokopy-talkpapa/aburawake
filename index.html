@@ -47,18 +47,29 @@
   #stage{position:absolute; inset:0;}
 
   .container{
-    position:absolute; width:96px; touch-action:none; user-select:none;
+    position:absolute; width:auto; touch-action:none; user-select:none;
     display:flex; flex-direction:column; align-items:center; cursor:grab;
+    transform-origin:bottom center; transition:transform 0.25s ease;
   }
-  .container.dragging{cursor:grabbing; z-index:50; filter:drop-shadow(0 6px 10px rgba(0,0,0,0.3));}
+  .container.dragging{cursor:grabbing; z-index:50; filter:drop-shadow(0 6px 10px rgba(0,0,0,0.3)); transition:none;}
+  .container.tiltRight{transform:rotate(38deg);}
+  .container.tiltLeft{transform:rotate(-38deg);}
   .flask{
-    position:relative; width:90px; height:130px; border:4px solid var(--brown);
+    position:relative; border:4px solid var(--brown);
     border-top:none; border-radius:0 0 16px 16px; background:rgba(255,255,255,0.5);
     overflow:hidden;
   }
-  .flaskTop{width:98px; height:8px; margin-bottom:-4px; border:4px solid var(--brown); border-bottom:none; border-radius:6px 6px 0 0; background:#fff;}
-  .water{position:absolute; bottom:0; left:0; right:0; background:var(--water); transition:height 0.5s cubic-bezier(.4,1.4,.6,1);}
+  .flaskTop{height:8px; margin-bottom:-4px; border:4px solid var(--brown); border-bottom:none; border-radius:6px 6px 0 0; background:#fff;}
+  .water{position:absolute; bottom:0; left:0; right:0; background:var(--water); transition:height 0.6s cubic-bezier(.4,1.4,.6,1);}
   .waterTop{position:absolute; top:0; left:0; right:0; height:6px; background:rgba(255,255,255,0.5);}
+  .pourStream{position:fixed; width:6px; background:linear-gradient(var(--water), var(--teal)); border-radius:3px; opacity:0; z-index:55; pointer-events:none;}
+  .pourStream.show{animation:streamFlow 0.55s ease-in-out;}
+  @keyframes streamFlow{
+    0%{opacity:0;}
+    15%{opacity:0.9;}
+    80%{opacity:0.9;}
+    100%{opacity:0;}
+  }
   .ticks{position:absolute; inset:0; pointer-events:none;}
   .tick{position:absolute; left:0; right:0; height:1px; background:rgba(60,36,21,0.35); display:flex; align-items:center;}
   .tick span{font-size:9px; color:var(--brown); margin-left:3px; background:rgba(255,255,255,0.7); border-radius:3px; padding:0 2px;}
@@ -261,11 +272,17 @@ function renderStage(){
   stage.innerHTML = '';
 
   // dropzones: tap (top-left) and sink (top-right)
-  stage.appendChild(makeDropzone(TAP, '🚰', 0.06, 0.10));
-  stage.appendChild(makeDropzone(SINK, '🗑️', 0.94, 0.10));
+  const tapEl = makeDropzone(TAP, '🚰', 0.06, 0.10);
+  stage.appendChild(tapEl);
+  positionEl(tapEl, 0.06, 0.10);
+  const sinkEl = makeDropzone(SINK, '🗑️', 0.94, 0.10);
+  stage.appendChild(sinkEl);
+  positionEl(sinkEl, 0.94, 0.10);
 
   state.containers.forEach(c => {
-    stage.appendChild(makeContainer(c));
+    const el = makeContainer(c);
+    stage.appendChild(el);
+    positionEl(el, c.x, 0.42);
   });
 }
 
@@ -274,30 +291,37 @@ function makeDropzone(def, icon, xFrac, yFrac){
   el.className = 'dropzone';
   el.dataset.zoneId = def.id;
   el.innerHTML = `<div class="icon">${icon}</div><div class="dzLabel">${def.label}</div>`;
-  positionEl(el, xFrac, yFrac);
   return el;
 }
 
 function positionEl(el, xFrac, yFrac){
-  requestAnimationFrame(() => {
-    const rect = stage.getBoundingClientRect();
-    el.style.left = (rect.width * xFrac - el.offsetWidth/2) + 'px';
-    el.style.top = (rect.height * yFrac) + 'px';
-  });
+  const rect = stage.getBoundingClientRect();
+  el.style.left = (rect.width * xFrac - el.offsetWidth/2) + 'px';
+  el.style.top = (rect.height * yFrac) + 'px';
+}
+
+function sizeForCapacity(capacity){
+  const height = Math.min(220, 50 + capacity * 12);
+  const width = Math.min(140, 44 + capacity * 7);
+  return {width, height};
 }
 
 function makeContainer(c){
   const el = document.createElement('div');
   el.className = 'container';
   el.dataset.id = c.id;
-  positionEl(el, c.x, 0.42);
+
+  const {width, height} = sizeForCapacity(c.capacity);
 
   const top = document.createElement('div');
   top.className = 'flaskTop';
+  top.style.width = (width + 8) + 'px';
   el.appendChild(top);
 
   const flask = document.createElement('div');
   flask.className = 'flask';
+  flask.style.width = width + 'px';
+  flask.style.height = height + 'px';
 
   const water = document.createElement('div');
   water.className = 'water';
@@ -392,16 +416,51 @@ function attachDrag(el, containerDef){
 
     const point = getLastPoint(e);
     const target = findDropTarget(point, el);
+    const homeC = state.containers.find(c => c.id === containerDef.id);
+
     if(target){
-      performPour(containerDef, target);
+      const targetEl = target.type === 'container'
+        ? stage.querySelector(`.container[data-id="${target.id}"]`)
+        : stage.querySelector(`.dropzone[data-zone-id="${target.id}"]`);
+      const poured = performPour(containerDef, target);
+      if(poured && targetEl){
+        animatePour(el, targetEl);
+        setTimeout(() => positionEl(el, homeC.x, 0.42), 600);
+        return;
+      }
     }
     // snap back to home slot
-    const homeC = state.containers.find(c => c.id === containerDef.id);
     positionEl(el, homeC.x, 0.42);
   };
 
   el.addEventListener('mousedown', onDown);
   el.addEventListener('touchstart', onDown, {passive:false});
+}
+
+function animatePour(sourceEl, targetEl){
+  const sRect = sourceEl.getBoundingClientRect();
+  const tRect = targetEl.getBoundingClientRect();
+  const tiltClass = (tRect.left + tRect.width/2 < sRect.left + sRect.width/2) ? 'tiltLeft' : 'tiltRight';
+  sourceEl.classList.add(tiltClass);
+  setTimeout(() => sourceEl.classList.remove(tiltClass), 600);
+
+  const x1 = sRect.left + sRect.width/2;
+  const y1 = sRect.top + sRect.height*0.55;
+  const x2 = tRect.left + tRect.width/2;
+  const y2 = tRect.top + tRect.height*0.25;
+  const dx = x2-x1, dy = y2-y1;
+  const dist = Math.max(10, Math.sqrt(dx*dx+dy*dy));
+  const angle = Math.atan2(dy, dx) * 180/Math.PI + 90;
+
+  const stream = document.createElement('div');
+  stream.className = 'pourStream show';
+  stream.style.left = x1 + 'px';
+  stream.style.top = y1 + 'px';
+  stream.style.height = dist + 'px';
+  stream.style.transform = `rotate(${angle}deg)`;
+  stream.style.transformOrigin = 'top center';
+  document.body.appendChild(stream);
+  setTimeout(() => stream.remove(), 600);
 }
 
 function getPoint(e){
@@ -440,24 +499,27 @@ function clearHighlight(){
 
 function performPour(sourceDef, target){
   const source = state.containers.find(c => c.id === sourceDef.id);
-  if(!source) return;
+  if(!source) return false;
 
   if(target.type === 'zone' && target.id === TAP.id){
+    if(source.amount === source.capacity) return false;
     source.amount = source.capacity; // fill from tap
   } else if(target.type === 'zone' && target.id === SINK.id){
+    if(source.amount === 0) return false;
     source.amount = 0; // dump out
   } else if(target.type === 'container'){
     const dest = state.containers.find(c => c.id === target.id);
-    if(!dest) return;
+    if(!dest) return false;
     const move = Math.min(source.amount, dest.capacity - dest.amount);
-    if(move <= 0) return;
+    if(move <= 0) return false;
     source.amount -= move;
     dest.amount += move;
   } else {
-    return;
+    return false;
   }
   refreshAll();
   checkGoal();
+  return true;
 }
 
 function checkGoal(){
