@@ -40,6 +40,7 @@
   .levelCard.cleared{border-color:var(--orange);}
   .levelCard h4{margin:0 0 6px 0; font-size:15px;}
   .levelCard p{margin:0; font-size:12px; color:#888;}
+  .levelCard p.best{margin-top:4px; color:var(--orange); font-weight:bold;}
   .star{color:var(--orange);}
 
   /* ---------- Play area ---------- */
@@ -81,7 +82,9 @@
   #successOverlay{position:absolute; inset:0; background:rgba(255,255,255,0.9); display:none; align-items:center; justify-content:center; flex-direction:column; z-index:60;}
   #successOverlay.show{display:flex;}
   #successOverlay .big{font-size:56px;}
-  #successOverlay h2{color:var(--orange); font-size:26px; margin:6px 0 18px;}
+  #successOverlay h2{color:var(--orange); font-size:26px; margin:6px 0 10px;}
+  #successOverlay #successMoves{font-size:16px; margin:0 0 4px;}
+  #successOverlay #successBest{font-size:14px; color:var(--orange); font-weight:bold; margin:0 0 18px; min-height:18px;}
 
   #missionIntro{position:absolute; inset:0; background:var(--bg); display:none; align-items:center; justify-content:center; flex-direction:column; z-index:70; padding:24px; text-align:center;}
   #missionIntro.show{display:flex;}
@@ -113,6 +116,8 @@
     <div id="successOverlay">
       <div class="big">🎉</div>
       <h2>できた！</h2>
+      <div id="successMoves"></div>
+      <div id="successBest"></div>
       <button class="orange" id="nextBtn">つぎのもんだいへ ▶</button>
     </div>
     <div id="missionIntro">
@@ -216,12 +221,17 @@ const SINK = {id:'__sink', label:'すてる'};
 
 let state = null; // current level runtime state
 let progress = JSON.parse(localStorage.getItem('aburawake_progress') || '{}');
+Object.keys(progress).forEach(id => {
+  if(progress[id] === true) progress[id] = {cleared:true, best:null};
+});
 
 const stage = document.getElementById('stage');
 const goalText = document.getElementById('goalText');
 const levelBadge = document.getElementById('levelBadge');
 const meterToggle = document.getElementById('meterToggle');
 const successOverlay = document.getElementById('successOverlay');
+const successMoves = document.getElementById('successMoves');
+const successBest = document.getElementById('successBest');
 const levelSelect = document.getElementById('levelSelect');
 const levelGroups = document.getElementById('levelGroups');
 const missionIntro = document.getElementById('missionIntro');
@@ -229,7 +239,10 @@ const missionIntroBadge = document.getElementById('missionIntroBadge');
 const missionIntroTitle = document.getElementById('missionIntroTitle');
 const missionIntroDesc = document.getElementById('missionIntroDesc');
 
-function saveProgress(){ localStorage.setItem('aburawake_progress', JSON.stringify(progress)); }
+function saveProgress(){
+  try { localStorage.setItem('aburawake_progress', JSON.stringify(progress)); }
+  catch(e) { /* localStorage unavailable, ignore */ }
+}
 
 function buildLevelSelect(){
   levelGroups.innerHTML = '';
@@ -244,9 +257,12 @@ function buildLevelSelect(){
     const grid = document.createElement('div');
     grid.className = 'levelGrid';
     groups[gname].forEach(l => {
+      const p = progress[l.id];
       const card = document.createElement('div');
-      card.className = 'levelCard' + (progress[l.id] ? ' cleared' : '');
-      card.innerHTML = `<h4>${progress[l.id] ? '<span class="star">★</span> ' : ''}${l.title}</h4><p>${l.desc}</p>`;
+      card.className = 'levelCard' + (p && p.cleared ? ' cleared' : '');
+      const bestHtml = (p && p.cleared && typeof p.best === 'number')
+        ? `<p class="best">さいしょう ${p.best}かい</p>` : '';
+      card.innerHTML = `<h4>${p && p.cleared ? '<span class="star">★</span> ' : ''}${l.title}</h4><p>${l.desc}</p>${bestHtml}`;
       card.onclick = () => { loadLevel(l.id); levelSelect.classList.remove('show'); };
       grid.appendChild(card);
     });
@@ -260,6 +276,7 @@ function loadLevel(id){
   state = {
     def,
     containers: def.containers.map(c => ({...c})),
+    moveCount: 0,
   };
   levelBadge.textContent = def.title;
   goalText.textContent = `🎯 ${def.desc}`;
@@ -468,6 +485,7 @@ function checkHoverFill(point, el, containerDef){
   const source = state.containers.find(c => c.id === containerDef.id);
   if(!source || source.amount >= source.capacity) return;
   source.amount = source.capacity;
+  state.moveCount = (state.moveCount||0) + 1;
   refreshAll();
   checkGoal();
   const tapEl = stage.querySelector(`.dropzone[data-zone-id="${TAP.id}"]`);
@@ -551,6 +569,7 @@ function performPour(sourceDef, target){
   } else {
     return false;
   }
+  state.moveCount = (state.moveCount||0) + 1;
   refreshAll();
   checkGoal();
   return true;
@@ -563,10 +582,21 @@ function checkGoal(){
     return c && c.amount === g.amount;
   });
   if(allMet){
-    progress[state.def.id] = true;
+    const moves = state.moveCount;
+    const prev = progress[state.def.id];
+    const prevBest = prev && typeof prev.best === 'number' ? prev.best : null;
+    const isNewBest = prevBest === null || moves <= prevBest;
+    const best = isNewBest ? moves : prevBest;
+    progress[state.def.id] = {cleared:true, best};
     saveProgress();
-    setTimeout(() => successOverlay.classList.add('show'), 400);
+    setTimeout(() => showSuccess(moves, isNewBest), 400);
   }
+}
+
+function showSuccess(moves, isNewBest){
+  successMoves.textContent = `${moves}かいで うつしたよ`;
+  successBest.textContent = isNewBest ? '⭐️ ここまでで いちばん すくない かいすうだよ！' : '';
+  successOverlay.classList.add('show');
 }
 
 document.getElementById('resetBtn').onclick = () => loadLevel(state.def.id);
