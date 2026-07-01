@@ -32,7 +32,8 @@
   /* ---------- Level select ---------- */
   #levelSelect{position:absolute; inset:0; background:var(--bg); z-index:30; overflow-y:auto; padding:20px; display:none;}
   #levelSelect.show{display:block;}
-  #levelSelect h2{text-align:center; color:var(--brown);}
+  #levelSelect h2{text-align:center; color:var(--brown); margin:6px 0;}
+  .levelSelectHeader{display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap; margin-bottom:10px;}
   .levelGroup{margin-bottom:18px;}
   .levelGroup h3{color:var(--teal); font-size:14px; margin:6px 4px;}
   .levelGrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px;}
@@ -133,7 +134,10 @@
   </div>
 
   <div id="levelSelect">
-    <h2>🛢️ あぶらわけ - もんだいをえらぼう</h2>
+    <div class="levelSelectHeader">
+      <h2>🛢️ あぶらわけ - もんだいをえらぼう</h2>
+      <button class="secondary" id="progressResetBtn">🗑️ きろくをリセット</button>
+    </div>
     <div id="levelGroups"></div>
   </div>
 
@@ -181,19 +185,19 @@ const LEVELS = [
   },
   // --- ちゅうくらい ---
   {
-    id: 5, group: "ちゅうくらい", title:"5dLから2dLをとりわけよう",
-    desc:"5dLいっぱいの入れ物から、2dLカップに ちょうど2dL うつそう。のこりは何dL？",
+    id: 5, group: "ちゅうくらい", title:"3dLをつくろう",
+    desc:"5dLの入れ物と2dLカップを つかって、ちょうど3dL つくろう。",
     containers:[
-      {id:'a', capacity:5, amount:5, x:0.3, label:'5dL（いっぱい）'},
+      {id:'a', capacity:5, amount:0, x:0.3, label:'5dLの入れ物'},
       {id:'b', capacity:2, amount:0, x:0.65, label:'2dLカップ'},
     ],
     goal:{id:'a', amount:3},
   },
   {
-    id: 6, group: "ちゅうくらい", title:"6dLから4dLをとりわけよう",
-    desc:"6dLいっぱいの入れ物から、4dLカップに そそごう。のこりは何dL？",
+    id: 6, group: "ちゅうくらい", title:"2dLをつくろう",
+    desc:"6dLの入れ物と4dLカップを つかって、ちょうど2dL つくろう。",
     containers:[
-      {id:'a', capacity:6, amount:6, x:0.3, label:'6dL（いっぱい）'},
+      {id:'a', capacity:6, amount:0, x:0.3, label:'6dLの入れ物'},
       {id:'b', capacity:4, amount:0, x:0.65, label:'4dLカップ'},
     ],
     goal:{id:'a', amount:2},
@@ -691,6 +695,12 @@ document.getElementById('shotBtn').onclick = () => {
 };
 
 document.getElementById('resetBtn').onclick = () => { if(state) loadLevel(state.def.id); };
+document.getElementById('progressResetBtn').onclick = () => {
+  if(!confirm('いままでの ★や🏆の きろくを ぜんぶ けしますか？')) return;
+  progress = {};
+  saveProgress();
+  buildLevelSelect();
+};
 document.getElementById('levelBtn').onclick = () => {
   missionIntro.classList.remove('show');
   successOverlay.classList.remove('show');
