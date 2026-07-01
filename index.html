@@ -229,13 +229,6 @@ let progress = JSON.parse(localStorage.getItem('aburawake_progress') || '{}');
 Object.keys(progress).forEach(id => {
   if(progress[id] === true) progress[id] = {cleared:true, best:null};
 });
-Object.keys(progress).forEach(id => {
-  const p = progress[id];
-  if(p && p.cleared && typeof p.best === 'number' && !p.perfect){
-    const optimal = getOptimalMoves(Number(id));
-    if(optimal !== null && p.best === optimal) p.perfect = true;
-  }
-});
 
 const stage = document.getElementById('stage');
 const goalText = document.getElementById('goalText');
@@ -308,6 +301,14 @@ function getOptimalMoves(id){
   optimalCache[id] = result;
   return result;
 }
+
+Object.keys(progress).forEach(id => {
+  const p = progress[id];
+  if(p && p.cleared && typeof p.best === 'number' && !p.perfect){
+    const optimal = getOptimalMoves(Number(id));
+    if(optimal !== null && p.best === optimal) p.perfect = true;
+  }
+});
 
 function buildLevelSelect(){
   levelGroups.innerHTML = '';
