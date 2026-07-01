@@ -691,7 +691,8 @@ document.getElementById('shotBtn').onclick = () => {
     canvas.toBlob(blob => {
       if(!blob) return;
       const file = new File([blob], filename, {type:'image/png'});
-      const fallbackDownload = () => {
+      const fallbackDownload = (reason) => {
+        showShotDebug('ファイル保存 (' + reason + ')');
         const link = document.createElement('a');
         link.download = filename;
         link.href = URL.createObjectURL(blob);
@@ -699,16 +700,32 @@ document.getElementById('shotBtn').onclick = () => {
         setTimeout(() => URL.revokeObjectURL(link.href), 3000);
       };
       if(navigator.canShare && navigator.canShare({files:[file]})){
-        navigator.share({files:[file]}).catch(err => {
-          if(err && err.name === 'AbortError') return;
-          fallbackDownload();
+        navigator.share({files:[file]}).then(() => {
+          showShotDebug('共有シートOK');
+        }).catch(err => {
+          if(err && err.name === 'AbortError'){ showShotDebug('共有キャンセル'); return; }
+          fallbackDownload('共有失敗:' + (err && err.name));
         });
         return;
       }
-      fallbackDownload();
+      fallbackDownload('共有非対応');
     }, 'image/png');
   });
 };
+
+function showShotDebug(text){
+  let el = document.getElementById('shotDebug');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'shotDebug';
+    el.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:rgba(60,36,21,0.9);color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;z-index:999;max-width:90vw;text-align:center;';
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  el.style.display = 'block';
+  clearTimeout(el._hideTimer);
+  el._hideTimer = setTimeout(() => { el.style.display = 'none'; }, 6000);
+}
 
 document.getElementById('resetBtn').onclick = () => { if(state) loadLevel(state.def.id); };
 document.getElementById('progressResetBtn').onclick = () => {
