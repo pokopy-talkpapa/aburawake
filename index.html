@@ -38,10 +38,12 @@
   .levelGrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px;}
   .levelCard{background:#fff; border-radius:14px; padding:12px; box-shadow:0 2px 6px rgba(0,0,0,0.1); cursor:pointer; border:2px solid transparent;}
   .levelCard.cleared{border-color:var(--orange);}
+  .levelCard.perfect{border-color:#FFD700; background:#FFFBEA;}
   .levelCard h4{margin:0 0 6px 0; font-size:15px;}
   .levelCard p{margin:0; font-size:12px; color:#888;}
   .levelCard p.best{margin-top:4px; color:var(--orange); font-weight:bold;}
   .star{color:var(--orange);}
+  .trophy{color:#DAA520;}
 
   /* ---------- Play area ---------- */
   #playArea{position:relative; flex:1; overflow:hidden;}
@@ -85,6 +87,7 @@
   #successOverlay h2{color:var(--orange); font-size:26px; margin:6px 0 10px;}
   #successOverlay #successMoves{font-size:16px; margin:0 0 4px;}
   #successOverlay #successBest{font-size:14px; color:var(--orange); font-weight:bold; margin:0 0 18px; min-height:18px;}
+  #successOverlay #successBest.perfect{color:#DAA520;}
 
   #missionIntro{position:absolute; inset:0; background:var(--bg); display:none; align-items:center; justify-content:center; flex-direction:column; z-index:70; padding:24px; text-align:center;}
   #missionIntro.show{display:flex;}
@@ -226,6 +229,13 @@ let progress = JSON.parse(localStorage.getItem('aburawake_progress') || '{}');
 Object.keys(progress).forEach(id => {
   if(progress[id] === true) progress[id] = {cleared:true, best:null};
 });
+Object.keys(progress).forEach(id => {
+  const p = progress[id];
+  if(p && p.cleared && typeof p.best === 'number' && !p.perfect){
+    const optimal = getOptimalMoves(Number(id));
+    if(optimal !== null && p.best === optimal) p.perfect = true;
+  }
+});
 
 const stage = document.getElementById('stage');
 const goalText = document.getElementById('goalText');
@@ -246,6 +256,59 @@ function saveProgress(){
   catch(e) { /* localStorage unavailable, ignore */ }
 }
 
+// BFS: そそぐ/みたす/すてる と同じ操作ルールで、ゴールまでの最短手数を求める
+const optimalCache = {};
+function getOptimalMoves(id){
+  if(id in optimalCache) return optimalCache[id];
+  const def = LEVELS.find(l => l.id === id);
+  const conts = def.containers;
+  const n = conts.length;
+  const capacities = conts.map(c => c.capacity);
+  const start = conts.map(c => c.amount);
+  const goal = (Array.isArray(def.goal) ? def.goal : [def.goal])
+    .map(g => ({idx: conts.findIndex(c => c.id === g.id), amount: g.amount}));
+  const isGoal = arr => goal.every(g => arr[g.idx] === g.amount);
+  const key = arr => arr.join(',');
+
+  let result = null;
+  if(isGoal(start)){
+    result = 0;
+  } else {
+    const visited = new Set([key(start)]);
+    let queue = [start];
+    let steps = 0;
+    outer:
+    while(queue.length){
+      steps++;
+      const next = [];
+      for(const s of queue){
+        const moves = [];
+        for(let i=0;i<n;i++){
+          if(s[i] < capacities[i]){ const m = s.slice(); m[i] = capacities[i]; moves.push(m); }
+          if(s[i] > 0){ const m = s.slice(); m[i] = 0; moves.push(m); }
+          for(let j=0;j<n;j++){
+            if(i===j) continue;
+            if(s[i] > 0 && s[j] < capacities[j]){
+              const amt = Math.min(s[i], capacities[j]-s[j]);
+              const m = s.slice(); m[i]-=amt; m[j]+=amt; moves.push(m);
+            }
+          }
+        }
+        for(const m of moves){
+          const k = key(m);
+          if(visited.has(k)) continue;
+          if(isGoal(m)){ result = steps; break outer; }
+          visited.add(k);
+          next.push(m);
+        }
+      }
+      queue = next;
+    }
+  }
+  optimalCache[id] = result;
+  return result;
+}
+
 function buildLevelSelect(){
   levelGroups.innerHTML = '';
   const groups = {};
@@ -261,10 +324,11 @@ function buildLevelSelect(){
     groups[gname].forEach(l => {
       const p = progress[l.id];
       const card = document.createElement('div');
-      card.className = 'levelCard' + (p && p.cleared ? ' cleared' : '');
+      card.className = 'levelCard' + (p && p.cleared ? ' cleared' : '') + (p && p.perfect ? ' perfect' : '');
       const bestHtml = (p && p.cleared && typeof p.best === 'number')
-        ? `<p class="best">さいしょう ${p.best}かい</p>` : '';
-      card.innerHTML = `<h4>${p && p.cleared ? '<span class="star">★</span> ' : ''}${l.title}</h4><p>${l.desc}</p>${bestHtml}`;
+        ? `<p class="best">さいしょう ${p.best}かい${p.perfect ? ' 🏆さいたん！' : ''}</p>` : '';
+      const badges = (p && p.perfect ? '<span class="trophy">🏆</span> ' : '') + (p && p.cleared ? '<span class="star">★</span> ' : '');
+      card.innerHTML = `<h4>${badges}${l.title}</h4><p>${l.desc}</p>${bestHtml}`;
       card.onclick = () => { loadLevel(l.id); levelSelect.classList.remove('show'); };
       grid.appendChild(card);
     });
@@ -589,15 +653,26 @@ function checkGoal(){
     const prevBest = prev && typeof prev.best === 'number' ? prev.best : null;
     const isNewBest = prevBest === null || moves <= prevBest;
     const best = isNewBest ? moves : prevBest;
-    progress[state.def.id] = {cleared:true, best};
+    const optimal = getOptimalMoves(state.def.id);
+    const perfect = (prev && prev.perfect) || (optimal !== null && best === optimal);
+    progress[state.def.id] = {cleared:true, best, perfect};
     saveProgress();
-    setTimeout(() => showSuccess(moves, isNewBest), 400);
+    const isPerfectRun = optimal !== null && moves === optimal;
+    setTimeout(() => showSuccess(moves, isNewBest, isPerfectRun), 400);
   }
 }
 
-function showSuccess(moves, isNewBest){
+function showSuccess(moves, isNewBest, isPerfectRun){
   successMoves.textContent = `${moves}かいで うつしたよ`;
-  successBest.textContent = isNewBest ? '⭐️ ここまでで いちばん すくない かいすうだよ！' : '';
+  successBest.classList.remove('perfect');
+  if(isPerfectRun){
+    successBest.textContent = '🏆 これいじょう すくなく できない、さいたんきろくだよ！';
+    successBest.classList.add('perfect');
+  } else if(isNewBest){
+    successBest.textContent = '⭐️ ここまでで いちばん すくない かいすうだよ！';
+  } else {
+    successBest.textContent = '';
+  }
   successOverlay.classList.add('show');
 }
 
