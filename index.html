@@ -484,7 +484,7 @@ function animatePour(sourceEl, targetEl){
   const y2 = tRect.top + tRect.height*0.25;
   const dx = x2-x1, dy = y2-y1;
   const dist = Math.max(10, Math.sqrt(dx*dx+dy*dy));
-  const angle = Math.atan2(dy, dx) * 180/Math.PI + 90;
+  const angle = Math.atan2(dy, dx) * 180/Math.PI - 90;
 
   const stream = document.createElement('div');
   stream.className = 'pourStream show';
