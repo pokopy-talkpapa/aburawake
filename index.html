@@ -691,15 +691,21 @@ document.getElementById('shotBtn').onclick = () => {
     canvas.toBlob(blob => {
       if(!blob) return;
       const file = new File([blob], filename, {type:'image/png'});
+      const fallbackDownload = () => {
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = URL.createObjectURL(blob);
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 3000);
+      };
       if(navigator.canShare && navigator.canShare({files:[file]})){
-        navigator.share({files:[file]}).catch(() => {});
+        navigator.share({files:[file]}).catch(err => {
+          if(err && err.name === 'AbortError') return;
+          fallbackDownload();
+        });
         return;
       }
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = URL.createObjectURL(blob);
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(link.href), 3000);
+      fallbackDownload();
     }, 'image/png');
   });
 };
