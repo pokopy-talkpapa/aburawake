@@ -399,8 +399,8 @@ function loadLevel(id){
     containers: def.containers.map(c => ({...c})),
     moveCount: 0,
   };
-  levelBadge.textContent = `レベル${def.num}/${LEVELS.length} ${def.title}`;
-  goalText.textContent = `🎯 ${def.desc}`;
+  levelBadge.textContent = `レベル${def.num}/${LEVELS.length}`;
+  goalText.textContent = `🎯 ${def.title}`;
   successOverlay.classList.remove('show');
   renderStage();
 }
@@ -411,8 +411,8 @@ function beginMission(id){
   missionIntroTitle.textContent = def.title;
   missionIntroDesc.textContent = def.desc;
   missionIntro.dataset.nextId = id;
-  levelBadge.textContent = `レベル${def.num}/${LEVELS.length} ${def.title}`;
-  goalText.textContent = `🎯 ${def.desc}`;
+  levelBadge.textContent = `レベル${def.num}/${LEVELS.length}`;
+  goalText.textContent = `🎯 ${def.title}`;
   successOverlay.classList.remove('show');
   missionIntro.classList.add('show');
 }
