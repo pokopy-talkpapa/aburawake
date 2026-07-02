@@ -772,7 +772,8 @@ document.getElementById('shotSaveBtn').onclick = () => {
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 3000);
   };
-  if(navigator.canShare && navigator.canShare({files:[file]})){
+  const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  if(isTouchDevice && navigator.canShare && navigator.canShare({files:[file]})){
     navigator.share({files:[file]}).then(() => {
       shotPreview.classList.remove('show');
     }).catch(err => {
