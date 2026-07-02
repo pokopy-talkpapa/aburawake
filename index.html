@@ -85,6 +85,8 @@
   #successOverlay{position:absolute; inset:0; background:rgba(255,255,255,0.9); display:none; align-items:center; justify-content:center; flex-direction:column; z-index:60;}
   #successOverlay.show{display:flex;}
   #successOverlay .big{font-size:56px;}
+  #successOverlay #successLevelBadge{font-size:13px; background:var(--teal); color:#fff; border-radius:12px; padding:3px 12px; margin-bottom:8px;}
+  #successOverlay #successLevelTitle{font-size:15px; color:var(--brown); font-weight:bold; margin:0 0 4px;}
   #successOverlay h2{color:var(--orange); font-size:26px; margin:6px 0 10px;}
   #successOverlay #successMoves{font-size:16px; margin:0 0 4px;}
   #successOverlay #successBest{font-size:14px; color:var(--orange); font-weight:bold; margin:0 0 18px; min-height:18px;}
@@ -125,6 +127,8 @@
   <div id="playArea">
     <div id="stage"></div>
     <div id="successOverlay">
+      <div id="successLevelBadge">-</div>
+      <div id="successLevelTitle">-</div>
       <div class="big">🎉</div>
       <h2>できた！</h2>
       <div id="successMoves"></div>
@@ -267,6 +271,7 @@ const LEVELS = [
     goal:[{id:'a', amount:5}, {id:'b', amount:5}],
   },
 ];
+LEVELS.forEach((l, i) => { l.num = i + 1; });
 
 const TAP = {id:'__tap', label:'すいどう'};
 const SINK = {id:'__sink', label:'すてる'};
@@ -282,6 +287,8 @@ const goalText = document.getElementById('goalText');
 const levelBadge = document.getElementById('levelBadge');
 const meterToggle = document.getElementById('meterToggle');
 const successOverlay = document.getElementById('successOverlay');
+const successLevelBadge = document.getElementById('successLevelBadge');
+const successLevelTitle = document.getElementById('successLevelTitle');
 const successMoves = document.getElementById('successMoves');
 const successBest = document.getElementById('successBest');
 const levelSelect = document.getElementById('levelSelect');
@@ -711,6 +718,8 @@ function checkGoal(){
 }
 
 function showSuccess(moves, isNewBest, isPerfectRun){
+  successLevelBadge.textContent = `レベル${state.def.num} / ${LEVELS.length}`;
+  successLevelTitle.textContent = state.def.title;
   successMoves.textContent = `${moves}かいで うつしたよ`;
   successBest.classList.remove('perfect');
   if(isPerfectRun){
