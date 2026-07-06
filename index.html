@@ -156,6 +156,7 @@
   <div id="levelSelect">
     <div class="levelSelectHeader">
       <h2>🛢️ あぶらわけ - もんだいをえらぼう</h2>
+      <button class="secondary" id="shotBtnLevelSelect">📸 スクショ</button>
       <button class="secondary" id="progressResetBtn">🗑️ きろくをリセット</button>
     </div>
     <div id="levelGroups"></div>
@@ -737,9 +738,9 @@ const shotPreview = document.getElementById('shotPreview');
 const shotPreviewImg = document.getElementById('shotPreviewImg');
 let pendingShot = null; // {blob, filename}
 
-document.getElementById('shotBtn').onclick = () => {
+function takeScreenshot(targetEl){
   if(typeof html2canvas !== 'function') return;
-  html2canvas(document.getElementById('playArea'), {backgroundColor:'#FFF8EF'}).then(canvas => {
+  html2canvas(targetEl, {backgroundColor:'#FFF8EF'}).then(canvas => {
     const now = new Date();
     const pad = n => String(n).padStart(2, '0');
     const stamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
@@ -756,7 +757,9 @@ document.getElementById('shotBtn').onclick = () => {
       shotPreview.classList.add('show');
     }, 'image/png');
   });
-};
+}
+document.getElementById('shotBtn').onclick = () => takeScreenshot(document.getElementById('playArea'));
+document.getElementById('shotBtnLevelSelect').onclick = () => takeScreenshot(document.getElementById('levelSelect'));
 
 document.getElementById('shotCloseBtn').onclick = () => {
   shotPreview.classList.remove('show');
