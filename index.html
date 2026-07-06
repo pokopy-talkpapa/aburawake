@@ -744,9 +744,11 @@ document.getElementById('shotBtn').onclick = () => {
     const pad = n => String(n).padStart(2, '0');
     const stamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
     const filename = `あぶらわけ_${stamp}.png`;
+    // iOSの共有シートは日本語ファイル名だと画像として認識せず「画像を保存」が出ないため、共有用は半角英数字にする
+    const shareFilename = `aburawake_${stamp}.png`;
     canvas.toBlob(blob => {
       if(!blob) return;
-      pendingShot = {blob, filename};
+      pendingShot = {blob, filename, shareFilename};
       if(shotPreviewImg.dataset.prevUrl) URL.revokeObjectURL(shotPreviewImg.dataset.prevUrl);
       const url = URL.createObjectURL(blob);
       shotPreviewImg.src = url;
@@ -762,8 +764,8 @@ document.getElementById('shotCloseBtn').onclick = () => {
 
 document.getElementById('shotSaveBtn').onclick = () => {
   if(!pendingShot) return;
-  const {blob, filename} = pendingShot;
-  const file = new File([blob], filename, {type:'image/png'});
+  const {blob, filename, shareFilename} = pendingShot;
+  const file = new File([blob], shareFilename, {type:'image/png'});
   const fallbackDownload = (reason) => {
     showShotDebug('ファイル保存 (' + reason + ')');
     const link = document.createElement('a');
