@@ -774,8 +774,10 @@ document.getElementById('shotSaveBtn').onclick = () => {
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 3000);
   };
-  const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-  if(isTouchDevice && navigator.canShare && navigator.canShare({files:[file]})){
+  // iOS Safariはblobの直接ダウンロードができないため共有シート経由が必須。
+  // Androidは共有シートの項目がOS/インストール済みアプリ依存で「保存」を出せないことがあるため、PC同様に直接ダウンロードを使う
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if(isIOS && navigator.canShare && navigator.canShare({files:[file]})){
     navigator.share({files:[file]}).then(() => {
       shotPreview.classList.remove('show');
     }).catch(err => {
